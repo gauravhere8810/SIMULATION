@@ -362,6 +362,20 @@ export default function BoxingRing({
   const [isTimeDilated, setIsTimeDilated] = useState<boolean>(false);
   const [isShaking, setIsShaking] = useState<boolean>(false);
   const shakeTimeoutRef = useRef<any>(null);
+
+  // Simulation state: 'IDLE', 'INTRO', or 'FIGHTING'
+  const [simState, setSimState] = useState<'IDLE' | 'INTRO' | 'FIGHTING'>(
+    mode === "sandbox" ? "FIGHTING" : "IDLE"
+  );
+  const simStateRef = useRef<'IDLE' | 'INTRO' | 'FIGHTING'>(
+    mode === "sandbox" ? "FIGHTING" : "IDLE"
+  );
+
+  useEffect(() => {
+    simStateRef.current = simState;
+  }, [simState]);
+
+  const introStartTimeRef = useRef<number>(0);
  
   const triggerShake = () => {
     setIsShaking(false);
@@ -424,6 +438,11 @@ export default function BoxingRing({
  
   useEffect(() => {
     modeRef.current = mode;
+    if (mode === "sandbox") {
+      setSimState("FIGHTING");
+    } else {
+      setSimState("IDLE");
+    }
   }, [mode]);
  
   useEffect(() => {
@@ -948,6 +967,16 @@ export default function BoxingRing({
  
     // Continuous Rotation Enforcer Loop
     Events.on(engine, "beforeUpdate", () => {
+      // Freeze physics positions if the state is INTRO or IDLE
+      if (simStateRef.current === 'INTRO' || simStateRef.current === 'IDLE') {
+        engine.timing.timeScale = 0;
+        return;
+      } else {
+        if (engine.timing.timeScale === 0) {
+          engine.timing.timeScale = 1.0;
+        }
+      }
+
       // Continuous Rotation Enforcer Loop
       const allBodies = Composite.allBodies(engine.world);
       allBodies.forEach((body) => {
@@ -1053,6 +1082,13 @@ export default function BoxingRing({
       isDilationActive = false;
       activeTimeouts.forEach(clearTimeout);
       activeTimeouts.length = 0;
+
+      setSimState('INTRO');
+      introStartTimeRef.current = Date.now();
+      const introTimeout = setTimeout(() => {
+        setSimState('FIGHTING');
+      }, 2000);
+      activeTimeouts.push(introTimeout);
 
       // Clear arena first
       const allBodies = Composite.allBodies(engine.world);
@@ -1176,6 +1212,12 @@ export default function BoxingRing({
  
     // Continuous Time-Dilation Tracker Hook
     Events.on(engine, "beforeUpdate", () => {
+      // Freeze physics positions if the state is INTRO or IDLE
+      if (simStateRef.current === 'INTRO' || simStateRef.current === 'IDLE') {
+        engine.timing.timeScale = 0;
+        return;
+      }
+
       const now = Date.now();
       const allBodies = Composite.allBodies(engine.world);
       
@@ -1904,7 +1946,37 @@ export default function BoxingRing({
         ctx.fillText(s.text, -1, -1);
         ctx.restore();
       });
- 
+
+      // Draw "READY... FIGHT!" if INTRO is active
+      if (simStateRef.current === 'INTRO') {
+        const elapsed = Date.now() - introStartTimeRef.current;
+        ctx.save();
+        ctx.font = 'normal 28px "Press Start 2P", monospace';
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        if (elapsed < 1200) {
+          // Pulse scale effect for "READY..."
+          const pulse = 1.0 + Math.sin(elapsed * 0.005) * 0.1;
+          ctx.translate(width / 2, height / 2 - 80);
+          ctx.scale(pulse, pulse);
+          ctx.shadowColor = "#ffea00";
+          ctx.shadowBlur = 12;
+          ctx.fillStyle = "#ffea00";
+          ctx.fillText("READY...", 0, 0);
+        } else {
+          // Slide in / zoom effect for "FIGHT!"
+          const scale = Math.min(2.0, 1.0 + (elapsed - 1200) * 0.005);
+          ctx.translate(width / 2, height / 2 - 80);
+          ctx.scale(scale, scale);
+          ctx.shadowColor = "#ef4444";
+          ctx.shadowBlur = 15;
+          ctx.fillStyle = "#ef4444";
+          ctx.fillText("FIGHT!", 0, 0);
+        }
+        ctx.restore();
+      }
+  
       updateLiveliness();
     });
  
