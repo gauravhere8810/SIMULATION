@@ -1,0 +1,139 @@
+@import "tailwindcss";
+
+:root {
+  --background: #03030b;
+  --foreground: #f8fafc;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-pixel: var(--font-press-start-2p);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, sans-serif;
+  overflow-x: hidden;
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(255, 0, 85, 0.05) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(0, 240, 255, 0.05) 0%, transparent 40%);
+  background-attachment: fixed;
+}
+
+/* Custom Pixel Art Styles & Neon Glows */
+
+.font-pixel {
+  font-family: var(--font-press-start-2p), monospace;
+}
+
+.neon-text-pink {
+  color: #ff0055;
+  text-shadow: 0 0 5px rgba(255, 0, 85, 0.5), 0 0 15px rgba(255, 0, 85, 0.8), 0 0 30px rgba(255, 0, 85, 0.4);
+}
+
+.neon-text-cyan {
+  color: #00f0ff;
+  text-shadow: 0 0 5px rgba(0, 240, 255, 0.5), 0 0 15px rgba(0, 240, 255, 0.8), 0 0 30px rgba(0, 240, 255, 0.4);
+}
+
+.neon-text-yellow {
+  color: #ffea00;
+  text-shadow: 0 0 5px rgba(255, 234, 0, 0.5), 0 0 15px rgba(255, 234, 0, 0.8);
+}
+
+.neon-border-pink {
+  border-color: #ff0055;
+  box-shadow: 0 0 10px rgba(255, 0, 85, 0.4), inset 0 0 10px rgba(255, 0, 85, 0.2);
+}
+
+.neon-border-cyan {
+  border-color: #00f0ff;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.4), inset 0 0 10px rgba(0, 240, 255, 0.2);
+}
+
+.neon-border-yellow {
+  border-color: #ffea00;
+  box-shadow: 0 0 10px rgba(255, 234, 0, 0.4), inset 0 0 10px rgba(255, 234, 0, 0.2);
+}
+
+.pixel-btn {
+  position: relative;
+  border-style: solid;
+  border-width: 4px;
+  image-rendering: pixelated;
+  transition: all 0.1s ease;
+  cursor: pointer;
+}
+
+.pixel-btn:active {
+  transform: translateY(2px);
+}
+
+/* Flickering Retro Animation */
+@keyframes flicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+    opacity: 1;
+  }
+  20%, 24%, 55% {
+    opacity: 0.7;
+  }
+}
+
+.flicker {
+  animation: flicker 4s infinite alternate;
+}
+
+/* Custom gradients */
+.bg-radial-gradient-vibe {
+  background: radial-gradient(circle, rgba(255,0,85,0.15) 0%, rgba(0,240,255,0.05) 50%, rgba(0,0,0,0) 100%);
+}
+
+/* Intense neon-red pulse glow keyframes and class for low HP warning */
+@keyframes critical-neon-glow {
+  0%, 100% {
+    box-shadow: 0 0 6px rgba(239, 68, 68, 0.4), inset 0 0 6px rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.95), inset 0 0 10px rgba(239, 68, 68, 0.5);
+    border-color: rgba(239, 68, 68, 1);
+  }
+}
+
+.animate-critical-glow {
+  animation: critical-neon-glow 0.8s infinite ease-in-out;
+}
+
+/* Pixel art background scanline texture */
+.scanlines {
+  position: relative;
+  overflow: hidden;
+}
+
+.scanlines::before {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+  z-index: 2;
+  background-size: 100% 2px, 3px 100%;
+  pointer-events: none;
+}
+
+/* Screen Shake Animation */
+@keyframes screen-shake {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  10% { transform: translate(-10px, 8px) rotate(-1.5deg); }
+  30% { transform: translate(12px, -8px) rotate(1.5deg); }
+  50% { transform: translate(-9px, -9px) rotate(-0.8deg); }
+  70% { transform: translate(9px, 6px) rotate(1.2deg); }
+  90% { transform: translate(-4px, -2px) rotate(-0.5deg); }
+}
+.animate-shake {
+  animation: screen-shake 0.18s ease-in-out;
+}
