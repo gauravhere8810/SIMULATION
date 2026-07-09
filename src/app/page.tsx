@@ -1,39 +1,61 @@
 "use client";
- 
-import React, { useState, useRef } from "react";
+
+import React, { useState, useRef, useEffect } from "react";
 import BoxingRing from "@/components/BoxingRing";
 import { ROSTER_DATA } from "@/constants/roster";
 import { APP_CONFIG } from "@/constants/config";
- 
+
 export default function Home() {
   const [mode, setMode] = useState<"sandbox" | "pvp">("sandbox");
   const [selectedCharacterId, setSelectedCharacterId] = useState<string>("mrbeast");
   const [selectedWeaponId, setSelectedWeaponId] = useState<string>("lightsaber");
-  
+
   // PvP selections
   const [p1CharacterId, setP1CharacterId] = useState<string>("mrbeast");
   const [p1WeaponId, setP1WeaponId] = useState<string>("lightsaber");
   const [p2CharacterId, setP2CharacterId] = useState<string>("ishowspeed");
   const [p2WeaponId, setP2WeaponId] = useState<string>("boxing_glove");
- 
+
   const [gravity, setGravity] = useState<number>(0.8);
   const [activeCount, setActiveCount] = useState<number>(0);
   const [wepDropdownOpen, setWepDropdownOpen] = useState<boolean>(false);
   const [muted, setMuted] = useState<boolean>(false);
- 
+
   // Reel Mode States
   const [isReelMode, setIsReelMode] = useState<boolean>(false);
   const [subtitle, setSubtitle] = useState<string>("STREET FIGHT SIMULATOR");
   const [pvpP1State, setPvpP1State] = useState<any | null>(null);
   const [pvpP2State, setPvpP2State] = useState<any | null>(null);
   const [fighters, setFighters] = useState<Array<{ id: string; charId: string; name: string; hp: number; maxHp: number }>>([]);
- 
+
   const onResetRef = useRef<(() => void) | null>(null);
   const onStartDuelRef = useRef<(() => void) | null>(null);
- 
+
+  const [p1Wins, setP1Wins] = useState<number>(0);
+  const [p2Wins, setP2Wins] = useState<number>(0);
+  const duelFinishedRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    if (mode === "pvp" && pvpP1State && pvpP2State) {
+      if (pvpP1State.hp === 0 && pvpP2State.hp > 0) {
+        if (!duelFinishedRef.current) {
+          setP2Wins((prev) => prev + 1);
+          duelFinishedRef.current = true;
+        }
+      } else if (pvpP2State.hp === 0 && pvpP1State.hp > 0) {
+        if (!duelFinishedRef.current) {
+          setP1Wins((prev) => prev + 1);
+          duelFinishedRef.current = true;
+        }
+      } else if (pvpP1State.hp > 0 && pvpP2State.hp > 0) {
+        duelFinishedRef.current = false;
+      }
+    }
+  }, [pvpP1State?.hp, pvpP2State?.hp, mode]);
+
   // Determine the active weapon config details for Sandbox mode
   const selectedWeapon = ROSTER_DATA.weapons.find((w) => w.id === selectedWeaponId);
- 
+
   // Determine the liveliness status based on the count of active bodies
   const getLivelinessStatus = (count: number) => {
     if (count === 0) return { text: "EMPTY", color: "text-zinc-500" };
@@ -42,9 +64,9 @@ export default function Home() {
     if (count <= 10) return { text: "ROYALE", color: "neon-text-pink" };
     return { text: "MAYHEM", color: "neon-text-yellow animate-pulse" };
   };
- 
+
   const status = getLivelinessStatus(activeCount);
- 
+
   const handleModeChange = (newMode: "sandbox" | "pvp") => {
     setMode(newMode);
     // Brief delay to allow Matter.js scene to react and state properties to align
@@ -56,16 +78,16 @@ export default function Home() {
       }
     }, 60);
   };
- 
+
   return (
     <main className="flex min-h-screen flex-col items-center justify-between p-4 md:p-8 bg-[#04040a] relative overflow-hidden">
       {/* Background neon ambient overlay */}
       <div className="absolute inset-0 bg-radial-gradient-vibe pointer-events-none opacity-40" />
- 
+
       {isReelMode ? (
         /* Reel Mode View */
         <div className="z-10 flex flex-col items-center justify-center min-h-screen py-4 w-full relative">
-          
+
           {/* Floating Exit Button */}
           <button
             onClick={() => setIsReelMode(false)}
@@ -78,7 +100,8 @@ export default function Home() {
           <div className="w-[350px] sm:w-[390px] h-[700px] sm:h-[780px] border-4 border-zinc-800 rounded-[40px] bg-[#090915] overflow-hidden flex flex-col items-center justify-center p-5 shadow-[0_0_60px_rgba(255,0,85,0.15),0_0_20px_rgba(0,240,255,0.1)] relative">
 
             {/* Reel Title Area */}
-            <div className="absolute top-8 left-5 right-5 flex flex-col items-center text-center flex-shrink-0">
+            <div className={`absolute left-5 right-5 flex flex-col items-center text-center z-20 ${mode === "pvp" ? "hidden" : "top-8"
+              }`}>
               <h1 className="font-pixel text-[8px] uppercase tracking-widest text-pink-500/80 mb-1">
                 {APP_CONFIG.title}
               </h1>
@@ -87,8 +110,8 @@ export default function Home() {
               </p>
             </div>
 
-            {/* The Arena Container (Square) - Centered vertically in standard flow */}
-            <div className="w-full aspect-square flex items-center justify-center flex-shrink-0 relative -translate-y-12">
+            {/* The Arena Container - Full Bleed 9:16 background */}
+            <div className="absolute inset-0 w-full h-full rounded-[36px] overflow-hidden z-0">
               <BoxingRing
                 gravity={gravity}
                 selectedCharacterId={selectedCharacterId}
@@ -116,75 +139,8 @@ export default function Home() {
             {/* Bottom HUD: Health Displays instead of general stats */}
             <div className="absolute bottom-8 left-5 right-5 flex flex-col items-center overflow-hidden z-20 w-[calc(100%-2.5rem)]">
               {mode === "pvp" ? (
-                /* PvP Health Display */
-                pvpP1State && pvpP2State ? (
-                  <div className="w-full flex flex-col gap-3 bg-black/40 border-2 border-zinc-800 p-3 rounded-2xl">
-                    <div className="border-b border-zinc-800 pb-1.5 flex justify-between items-center">
-                      <span className="font-pixel text-[7px] text-[#ffea00]">FIGHTER VITALS</span>
-                      <span className="font-pixel text-[6px] text-zinc-500">PVP MODE</span>
-                    </div>
-
-                    {/* Player 1 Health */}
-                    <div className="flex flex-col gap-1">
-                      <div className="flex justify-between items-baseline">
-                        <span className="font-pixel text-[8px] text-cyan-400 font-bold uppercase truncate max-w-[75%] flex items-center gap-1">
-                          <span>{pvpP1State.character?.name || "Player 1"}</span>
-                          {pvpP1State.activePowerUp && (
-                            <span className="text-[6px] text-yellow-400 animate-pulse">
-                              [{pvpP1State.activePowerUp.toUpperCase()}]
-                            </span>
-                          )}
-                        </span>
-                        <span className="font-pixel text-[7px] text-zinc-400">
-                          {Math.round((pvpP1State.hp / pvpP1State.maxHp) * 100)}%
-                        </span>
-                      </div>
-                      <div className="h-2.5 bg-red-950 border border-zinc-800 rounded relative overflow-hidden">
-                        <div
-                          className="h-full bg-red-600 absolute left-0 top-0 transition-all duration-500"
-                          style={{ width: `${(pvpP1State.ghostHp / pvpP1State.maxHp) * 100}%` }}
-                        />
-                        <div
-                          className="h-full bg-gradient-to-r from-amber-600 to-amber-400 absolute left-0 top-0 transition-all duration-75"
-                          style={{ width: `${(pvpP1State.hp / pvpP1State.maxHp) * 100}%` }}
-                        />
-                        {pvpP1State.flash && <div className="absolute inset-0 bg-white" />}
-                      </div>
-                    </div>
-
-                    {/* Player 2 Health */}
-                    <div className="flex flex-col gap-1 mt-1">
-                      <div className="flex justify-between items-baseline">
-                        <span className="font-pixel text-[8px] text-red-400 font-bold uppercase truncate max-w-[75%] flex items-center gap-1">
-                          <span>{pvpP2State.character?.name || "Player 2"}</span>
-                          {pvpP2State.activePowerUp && (
-                            <span className="text-[6px] text-yellow-400 animate-pulse">
-                              [{pvpP2State.activePowerUp.toUpperCase()}]
-                            </span>
-                          )}
-                        </span>
-                        <span className="font-pixel text-[7px] text-zinc-400">
-                          {Math.round((pvpP2State.hp / pvpP2State.maxHp) * 100)}%
-                        </span>
-                      </div>
-                      <div className="h-2.5 bg-red-950 border border-zinc-800 rounded relative overflow-hidden">
-                        <div
-                          className="h-full bg-red-600 absolute left-0 top-0 transition-all duration-500"
-                          style={{ width: `${(pvpP2State.ghostHp / pvpP2State.maxHp) * 100}%` }}
-                        />
-                        <div
-                          className="h-full bg-gradient-to-r from-amber-600 to-amber-400 absolute left-0 top-0 transition-all duration-75"
-                          style={{ width: `${(pvpP2State.hp / pvpP2State.maxHp) * 100}%` }}
-                        />
-                        {pvpP2State.flash && <div className="absolute inset-0 bg-white" />}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="font-pixel text-[7px] text-zinc-500 text-center animate-pulse py-6 border-2 border-dashed border-zinc-800 rounded-xl w-full">
-                    ⚔️ START DUEL TO INITIALIZE VITALS
-                  </div>
-                )
+                /* PvP Health display is now positioned above the ring */
+                null
               ) : (
                 /* Sandbox Mode Dynamic Health Display */
                 <div className="w-full flex flex-col gap-2 bg-black/40 border-2 border-zinc-800 p-2.5 rounded-2xl flex-1 max-h-[110px] overflow-hidden">
@@ -195,7 +151,7 @@ export default function Home() {
 
                   {fighters.length === 0 ? (
                     <div className="font-pixel text-[7px] text-zinc-500 text-center py-4 my-auto">
-                      💡 CLICK IN THE RING ABOVE<br/>TO SPAWN FIGHTERS!
+                      💡 CLICK IN THE RING ABOVE<br />TO SPAWN FIGHTERS!
                     </div>
                   ) : (
                     <div className="flex flex-col gap-2 overflow-y-auto pr-1">
@@ -293,21 +249,19 @@ export default function Home() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleModeChange("sandbox")}
-                    className={`pixel-btn font-pixel text-[8px] flex-1 py-2.5 rounded transition-all ${
-                      mode === "sandbox"
-                        ? "bg-[#00f0ff]/20 text-[#00f0ff] border-[#00f0ff] shadow-[0_0_10px_rgba(0,240,255,0.3)]"
-                        : "bg-[#161622] text-zinc-400 border-zinc-700 hover:text-zinc-200"
-                    }`}
+                    className={`pixel-btn font-pixel text-[8px] flex-1 py-2.5 rounded transition-all ${mode === "sandbox"
+                      ? "bg-[#00f0ff]/20 text-[#00f0ff] border-[#00f0ff] shadow-[0_0_10px_rgba(0,240,255,0.3)]"
+                      : "bg-[#161622] text-zinc-400 border-zinc-700 hover:text-zinc-200"
+                      }`}
                   >
                     🎮 SANDBOX
                   </button>
                   <button
                     onClick={() => handleModeChange("pvp")}
-                    className={`pixel-btn font-pixel text-[8px] flex-1 py-2.5 rounded transition-all ${
-                      mode === "pvp"
-                        ? "bg-[#ff0055]/20 text-[#ff0055] border-[#ff0055] shadow-[0_0_10px_rgba(255,0,85,0.3)]"
-                        : "bg-[#161622] text-zinc-400 border-zinc-700 hover:text-zinc-200"
-                    }`}
+                    className={`pixel-btn font-pixel text-[8px] flex-1 py-2.5 rounded transition-all ${mode === "pvp"
+                      ? "bg-[#ff0055]/20 text-[#ff0055] border-[#ff0055] shadow-[0_0_10px_rgba(255,0,85,0.3)]"
+                      : "bg-[#161622] text-zinc-400 border-zinc-700 hover:text-zinc-200"
+                      }`}
                   >
                     ⚔️ PVP DUEL
                   </button>
@@ -339,11 +293,10 @@ export default function Home() {
                         <button
                           key={char.id}
                           onClick={() => setSelectedCharacterId(char.id)}
-                          className={`pixel-btn font-pixel p-2 rounded text-center flex flex-col items-center justify-center gap-1 transition-all ${
-                            selectedCharacterId === char.id
-                              ? "bg-[#1e40af]/30 text-white border-[#3b82f6] shadow-[0_0_12px_rgba(59,130,246,0.5)] scale-102"
-                              : "bg-[#161622] text-zinc-400 border-zinc-700 hover:text-zinc-200"
-                          }`}
+                          className={`pixel-btn font-pixel p-2 rounded text-center flex flex-col items-center justify-center gap-1 transition-all ${selectedCharacterId === char.id
+                            ? "bg-[#1e40af]/30 text-white border-[#3b82f6] shadow-[0_0_12px_rgba(59,130,246,0.5)] scale-102"
+                            : "bg-[#161622] text-zinc-400 border-zinc-700 hover:text-zinc-200"
+                            }`}
                         >
                           <span className="text-lg leading-none">{char.id === "mrbeast" ? "🔵" : "🔴"}</span>
                           <span className="text-[8px] truncate max-w-full font-bold">{char.name}</span>
@@ -375,9 +328,8 @@ export default function Home() {
                               setSelectedWeaponId(wep.id);
                               setWepDropdownOpen(false);
                             }}
-                            className={`font-pixel text-[9px] p-2.5 text-left rounded hover:bg-zinc-800 transition-all flex justify-between items-center ${
-                              selectedWeaponId === wep.id ? "text-[#00f0ff] bg-zinc-800/50" : "text-zinc-300"
-                            }`}
+                            className={`font-pixel text-[9px] p-2.5 text-left rounded hover:bg-zinc-800 transition-all flex justify-between items-center ${selectedWeaponId === wep.id ? "text-[#00f0ff] bg-zinc-800/50" : "text-zinc-300"
+                              }`}
                           >
                             <span>{wep.id === "lightsaber" ? "🟢 " : "🥊 "}{wep.name}</span>
                             <span className="text-[7px] text-zinc-500">DMG:{wep.damage}</span>
@@ -401,11 +353,10 @@ export default function Home() {
                           <button
                             key={`p1-char-${char.id}`}
                             onClick={() => setP1CharacterId(char.id)}
-                            className={`pixel-btn font-pixel p-1.5 rounded text-center flex flex-col items-center justify-center gap-0.5 transition-all ${
-                              p1CharacterId === char.id
-                                ? "bg-[#00f0ff]/20 text-white border-cyan-500 shadow-[0_0_8px_rgba(0,240,255,0.4)]"
-                                : "bg-[#161622] text-zinc-400 border-zinc-800 hover:text-zinc-200"
-                            }`}
+                            className={`pixel-btn font-pixel p-1.5 rounded text-center flex flex-col items-center justify-center gap-0.5 transition-all ${p1CharacterId === char.id
+                              ? "bg-[#00f0ff]/20 text-white border-cyan-500 shadow-[0_0_8px_rgba(0,240,255,0.4)]"
+                              : "bg-[#161622] text-zinc-400 border-zinc-800 hover:text-zinc-200"
+                              }`}
                           >
                             <span className="text-sm leading-none">{char.id === "mrbeast" ? "🔵" : "🔴"}</span>
                             <span className="text-[7px] truncate max-w-full font-bold">{char.name}</span>
@@ -436,11 +387,10 @@ export default function Home() {
                           <button
                             key={`p2-char-${char.id}`}
                             onClick={() => setP2CharacterId(char.id)}
-                            className={`pixel-btn font-pixel p-1.5 rounded text-center flex flex-col items-center justify-center gap-0.5 transition-all ${
-                              p2CharacterId === char.id
-                                ? "bg-[#ff0055]/20 text-white border-red-500 shadow-[0_0_8px_rgba(255,0,85,0.4)]"
-                                : "bg-[#161622] text-zinc-400 border-zinc-800 hover:text-zinc-200"
-                            }`}
+                            className={`pixel-btn font-pixel p-1.5 rounded text-center flex flex-col items-center justify-center gap-0.5 transition-all ${p2CharacterId === char.id
+                              ? "bg-[#ff0055]/20 text-white border-red-500 shadow-[0_0_8px_rgba(255,0,85,0.4)]"
+                              : "bg-[#161622] text-zinc-400 border-zinc-800 hover:text-zinc-200"
+                              }`}
                           >
                             <span className="text-sm leading-none">{char.id === "mrbeast" ? "🔵" : "🔴"}</span>
                             <span className="text-[7px] truncate max-w-full font-bold">{char.name}</span>
@@ -484,21 +434,19 @@ export default function Home() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => setGravity(0)}
-                    className={`pixel-btn font-pixel text-[8px] flex-1 py-2 rounded transition-all ${
-                      gravity === 0
-                        ? "bg-[#00f0ff]/20 text-[#00f0ff] border-[#00f0ff] shadow-[0_0_10px_rgba(0,240,255,0.3)]"
-                        : "bg-[#161622] text-zinc-400 border-zinc-700 hover:text-zinc-200"
-                    }`}
+                    className={`pixel-btn font-pixel text-[8px] flex-1 py-2 rounded transition-all ${gravity === 0
+                      ? "bg-[#00f0ff]/20 text-[#00f0ff] border-[#00f0ff] shadow-[0_0_10px_rgba(0,240,255,0.3)]"
+                      : "bg-[#161622] text-zinc-400 border-zinc-700 hover:text-zinc-200"
+                      }`}
                   >
                     🛰️ ZERO-G
                   </button>
                   <button
                     onClick={() => setGravity(0.8)}
-                    className={`pixel-btn font-pixel text-[8px] flex-1 py-2 rounded transition-all ${
-                      gravity === 0.8
-                        ? "bg-[#ff0055]/20 text-[#ff0055] border-[#ff0055] shadow-[0_0_10px_rgba(255,0,85,0.3)]"
-                        : "bg-[#161622] text-zinc-400 border-zinc-700 hover:text-zinc-200"
-                    }`}
+                    className={`pixel-btn font-pixel text-[8px] flex-1 py-2 rounded transition-all ${gravity === 0.8
+                      ? "bg-[#ff0055]/20 text-[#ff0055] border-[#ff0055] shadow-[0_0_10px_rgba(255,0,85,0.3)]"
+                      : "bg-[#161622] text-zinc-400 border-zinc-700 hover:text-zinc-200"
+                      }`}
                   >
                     🌍 STREET G
                   </button>
@@ -519,11 +467,10 @@ export default function Home() {
                 </button>
                 <button
                   onClick={() => setMuted(!muted)}
-                  className={`pixel-btn font-pixel text-[10px] py-3 px-2 rounded transition-all ${
-                    muted
-                      ? "bg-zinc-850 text-zinc-500 border-zinc-700 hover:text-zinc-300 hover:border-zinc-500"
-                      : "bg-[#00f0ff]/10 text-[#00f0ff] border-[#00f0ff] hover:bg-[#00f0ff]/20"
-                  }`}
+                  className={`pixel-btn font-pixel text-[10px] py-3 px-2 rounded transition-all ${muted
+                    ? "bg-zinc-850 text-zinc-500 border-zinc-700 hover:text-zinc-300 hover:border-zinc-500"
+                    : "bg-[#00f0ff]/10 text-[#00f0ff] border-[#00f0ff] hover:bg-[#00f0ff]/20"
+                    }`}
                 >
                   {muted ? "🔇 SOUNDS: OFF" : "🔊 SOUNDS: ON"}
                 </button>

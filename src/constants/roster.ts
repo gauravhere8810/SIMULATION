@@ -27,21 +27,21 @@ export const ROSTER_DATA: RosterDataConfig = {
   characters: [
     {
       id: "mrbeast",
-      name: "MrBeast",
+      name: "India",
       mass: 1.2,
       size: 64,
-      assetPath: "/images/characters/mrbeast.png",
+      assetPath: "/images/characters/India.png",
       baseHp: 100,
-      trailColor: "#00f0ff", // MrBeast themed cyan trail
+      trailColor: "#ff9933", // India saffron trail
     },
     {
       id: "ishowspeed",
-      name: "IShowSpeed",
+      name: "Pakistan",
       mass: 1.2,
       size: 64,
-      assetPath: "/images/characters/ishowspeed.png",
+      assetPath: "/images/characters/Pakistan.png",
       baseHp: 100,
-      trailColor: "#ef4444", // IShowSpeed themed red/crimson trail
+      trailColor: "#115c36", // Pakistan green trail
     },
   ],
   weapons: [
