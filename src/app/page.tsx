@@ -31,6 +31,11 @@ export default function Home() {
   const onResetRef = useRef<(() => void) | null>(null);
   const onStartDuelRef = useRef<(() => void) | null>(null);
 
+  // Manual / Automatic Recording refs and states
+  const [isRecording, setIsRecording] = useState<boolean>(false);
+  const onStartRecordingRef = useRef<(() => void) | null>(null);
+  const onStopRecordingRef = useRef<(() => void) | null>(null);
+
   const [p1Wins, setP1Wins] = useState<number>(0);
   const [p2Wins, setP2Wins] = useState<number>(0);
   const duelFinishedRef = useRef<boolean>(false);
@@ -126,6 +131,10 @@ export default function Home() {
                 p2WeaponId={p2WeaponId}
                 onStartDuelRef={onStartDuelRef}
                 isReelMode={true}
+                onStartRecordingRef={onStartRecordingRef}
+                onStopRecordingRef={onStopRecordingRef}
+                onRecordingStateChange={setIsRecording}
+                subtitle={subtitle}
                 onPvpStateChange={(p1, p2) => {
                   setPvpP1State(p1);
                   setPvpP2State(p2);
@@ -179,7 +188,7 @@ export default function Home() {
               )}
 
               {/* Action shortcuts / operations inside Reel Mode */}
-              <div className="grid grid-cols-2 gap-2.5 w-full mt-3 flex-shrink-0">
+              <div className="grid grid-cols-3 gap-2 w-full mt-3 flex-shrink-0">
                 <button
                   onClick={() => {
                     if (mode === "pvp") {
@@ -188,15 +197,29 @@ export default function Home() {
                       if (onResetRef.current) onResetRef.current();
                     }
                   }}
-                  className="pixel-btn font-pixel text-[8px] py-2 bg-zinc-900 border-zinc-700 text-yellow-400 hover:border-yellow-500 transition-all text-center rounded"
+                  className="pixel-btn font-pixel text-[7px] py-2 bg-zinc-900 border-zinc-700 text-yellow-400 hover:border-yellow-500 transition-all text-center rounded"
                 >
                   {mode === "pvp" ? "⚔️ DUEL AGAIN" : "⚠️ CLEAR RING"}
                 </button>
                 <button
                   onClick={() => setMuted(!muted)}
-                  className="pixel-btn font-pixel text-[8px] py-2 bg-zinc-900 border-zinc-700 text-cyan-400 hover:border-cyan-500 transition-all text-center rounded"
+                  className="pixel-btn font-pixel text-[7px] py-2 bg-zinc-900 border-zinc-700 text-cyan-400 hover:border-cyan-500 transition-all text-center rounded"
                 >
                   {muted ? "🔇 SOUND: OFF" : "🔊 SOUND: ON"}
+                </button>
+                <button
+                  onClick={() => {
+                    if (isRecording) {
+                      if (onStopRecordingRef.current) onStopRecordingRef.current();
+                    } else {
+                      if (onStartRecordingRef.current) onStartRecordingRef.current();
+                    }
+                  }}
+                  className={`pixel-btn font-pixel text-[7px] py-2 bg-zinc-900 border-zinc-700 transition-all text-center rounded ${
+                    isRecording ? "text-red-500 hover:border-red-500 animate-pulse font-bold" : "text-emerald-400 hover:border-emerald-500"
+                  }`}
+                >
+                  {isRecording ? "⏹️ STOP" : "🔴 RECORD"}
                 </button>
               </div>
             </div>
@@ -516,6 +539,10 @@ export default function Home() {
                 p2WeaponId={p2WeaponId}
                 onStartDuelRef={onStartDuelRef}
                 isReelMode={false}
+                onStartRecordingRef={onStartRecordingRef}
+                onStopRecordingRef={onStopRecordingRef}
+                onRecordingStateChange={setIsRecording}
+                subtitle={subtitle}
                 onPvpStateChange={(p1, p2) => {
                   setPvpP1State(p1);
                   setPvpP2State(p2);

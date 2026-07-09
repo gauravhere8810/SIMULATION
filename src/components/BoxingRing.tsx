@@ -25,6 +25,10 @@ interface BoxingRingProps {
   onFightersChange?: (
     fighters: Array<{ id: string; charId: string; name: string; hp: number; maxHp: number }>
   ) => void;
+  onStartRecordingRef?: React.MutableRefObject<(() => void) | null>;
+  onStopRecordingRef?: React.MutableRefObject<(() => void) | null>;
+  onRecordingStateChange?: (isRec: boolean) => void;
+  subtitle: string;
 }
 
 interface HitSplash {
@@ -783,6 +787,10 @@ export default function BoxingRing({
   isReelMode = false,
   onPvpStateChange,
   onFightersChange,
+  onStartRecordingRef,
+  onStopRecordingRef,
+  onRecordingStateChange,
+  subtitle,
 }: BoxingRingProps) {
   const sceneRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -795,9 +803,80 @@ export default function BoxingRing({
   const simStateRef = useRef<'IDLE' | 'INTRO' | 'FIGHTING'>('FIGHTING');
   const introStartTimeRef = useRef<number>(0);
 
-  // Health states for PvP HUD overlay
   const [p1State, setP1State] = useState<{ hp: number; maxHp: number; character: any } | null>(null);
   const [p2State, setP2State] = useState<{ hp: number; maxHp: number; character: any } | null>(null);
+
+  const p1StateRef = useRef<any>(null);
+  const p2StateRef = useRef<any>(null);
+
+  useEffect(() => {
+    p1StateRef.current = p1State;
+    p2StateRef.current = p2State;
+  }, [p1State, p2State]);
+
+  // Automatic WebM Recording States and Refs
+  const [isRecording, setIsRecording] = useState<boolean>(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+
+  const startRecording = () => {
+    if (typeof window === "undefined" || !canvasRef.current || !isReelModeRef.current) return;
+    try {
+      const canvas = canvasRef.current;
+      const stream = canvas.captureStream(60);
+      const mime = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"]
+        .find(m => MediaRecorder.isTypeSupported(m)) ?? "";
+
+      recordedChunksRef.current = [];
+      const options = {
+        mimeType: mime,
+        videoBitsPerSecond: 12000000 // 12 Mbps
+      };
+
+      const recorder = new MediaRecorder(stream, options);
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          recordedChunksRef.current.push(e.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        if (recordedChunksRef.current.length > 0) {
+          const blob = new Blob(recordedChunksRef.current, { type: "video/webm" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "showdown_clip.webm";
+          a.click();
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+        }
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setIsRecording(true);
+      console.log("Automatic WebM recording started at 60 FPS / 12 Mbps.");
+    } catch (err) {
+      console.error("Failed to start MediaRecorder:", err);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current = null;
+      setIsRecording(false);
+      console.log("Automatic WebM recording stopped.");
+    }
+  };
+
+  const startRecordingRef = useRef(startRecording);
+  const stopRecordingRef = useRef(stopRecording);
+
+  useEffect(() => {
+    startRecordingRef.current = startRecording;
+    stopRecordingRef.current = stopRecording;
+  });
 
   // Time dilation visual overlay state
   const [isTimeDilated, setIsTimeDilated] = useState<boolean>(false);
@@ -842,11 +921,22 @@ export default function BoxingRing({
   const onFightersChangeRef = useRef(onFightersChange);
   const onPvpStateChangeRef = useRef(onPvpStateChange);
   const isReelModeRef = useRef(isReelMode);
+  const subtitleRef = useRef(subtitle);
+
+  useEffect(() => {
+    subtitleRef.current = subtitle;
+  }, [subtitle]);
 
   // Keep references updated
   useEffect(() => {
     onFightersChangeRef.current = onFightersChange;
   }, [onFightersChange]);
+
+  useEffect(() => {
+    if (onRecordingStateChange) {
+      onRecordingStateChange(isRecording);
+    }
+  }, [isRecording, onRecordingStateChange]);
 
   useEffect(() => {
     onPvpStateChangeRef.current = onPvpStateChange;
@@ -1236,6 +1326,7 @@ export default function BoxingRing({
         wireframes: false,
         showVelocity: false,
         showAngleIndicator: false,
+        pixelRatio: isReelMode ? 2.4 : 1,
       },
     });
 
@@ -1629,6 +1720,8 @@ export default function BoxingRing({
     };
 
     onStartDuelRef.current = spawnDuel;
+    if (onStartRecordingRef) onStartRecordingRef.current = startRecording;
+    if (onStopRecordingRef) onStopRecordingRef.current = stopRecording;
 
     // Time Dilation variables
     let lastTimeDilationTime = 0;
@@ -2512,6 +2605,106 @@ export default function BoxingRing({
         }
       }
 
+      // Draw Canvas-based HUD and Titles in Reel Mode (so it captures in the recorded WebM file)
+      if (modeRef.current === "pvp" && isReelModeRef.current) {
+        ctx.save();
+        
+        // Coordinates alignment
+        const hudLeft = 35;
+        const hudRight = width - 35;
+        const barY = ringTop - 22;
+        const barH = 14;
+        const barW = 170;
+        
+        const p1Percent = p1StateRef.current ? Math.max(0, p1StateRef.current.hp / p1StateRef.current.maxHp) : 1.0;
+        const p2Percent = p2StateRef.current ? Math.max(0, p2StateRef.current.hp / p2StateRef.current.maxHp) : 1.0;
+        
+        // 1. Draw Player Names
+        ctx.font = 'normal 12px "Press Start 2P", monospace';
+        ctx.textBaseline = "middle";
+        
+        // P1 Name (Left)
+        ctx.textAlign = "left";
+        ctx.fillStyle = "#ff9933"; // saffron
+        ctx.shadowColor = "#ff9933";
+        ctx.shadowBlur = 6;
+        ctx.fillText("INDIA 🇮🇳", hudLeft, ringTop - 32);
+        
+        // P2 Name (Right)
+        ctx.textAlign = "right";
+        ctx.fillStyle = "#115c36"; // green
+        ctx.shadowColor = "#115c36";
+        ctx.shadowBlur = 6;
+        ctx.fillText("🇵🇰 PAKISTAN", hudRight, ringTop - 32);
+        
+        ctx.shadowBlur = 0; // Reset shadow for health bars
+        
+        // 2. Draw Health Bar Backgrounds
+        ctx.fillStyle = "#18181b";
+        ctx.fillRect(hudLeft, barY, barW, barH);
+        ctx.fillRect(width / 2 + 20, barY, barW, barH);
+        
+        // Health Bar Borders
+        ctx.strokeStyle = "#09090b";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(hudLeft, barY, barW, barH);
+        ctx.strokeRect(width / 2 + 20, barY, barW, barH);
+        
+        // 3. Draw Health Bar Fills (Gradients)
+        // P1 Gradient (Left-to-Right)
+        const p1Grad = ctx.createLinearGradient(hudLeft, 0, hudLeft + barW, 0);
+        p1Grad.addColorStop(0, "#d97706"); // amber-600
+        p1Grad.addColorStop(0.5, "#eab308"); // yellow-500
+        p1Grad.addColorStop(1, "#fbbf24"); // amber-400
+        ctx.fillStyle = p1Grad;
+        ctx.fillRect(hudLeft, barY, barW * p1Percent, barH);
+        
+        // P2 Gradient (Right-to-Left)
+        const p2Grad = ctx.createLinearGradient(width / 2 + 20, 0, hudRight, 0);
+        p2Grad.addColorStop(0, "#fbbf24"); // amber-400
+        p2Grad.addColorStop(0.5, "#eab308"); // yellow-500
+        p2Grad.addColorStop(1, "#d97706"); // amber-600
+        ctx.fillStyle = p2Grad;
+        ctx.fillRect(hudRight - barW * p2Percent, barY, barW * p2Percent, barH);
+        
+        // 4. Draw Percentage Text inside Health Bars
+        ctx.font = 'normal 7px "Press Start 2P", monospace';
+        ctx.fillStyle = "#ffffff";
+        ctx.textBaseline = "middle";
+        
+        // P1 HP text
+        ctx.textAlign = "left";
+        ctx.fillText(`HP: ${Math.round(p1Percent * 100)}%`, hudLeft + 6, barY + barH / 2);
+        
+        // P2 HP text
+        ctx.textAlign = "right";
+        ctx.fillText(`HP: ${Math.round(p2Percent * 100)}%`, hudRight - 6, barY + barH / 2);
+        
+        // 5. Draw Central VS Text
+        ctx.font = 'normal 8px "Press Start 2P", monospace';
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#ec4899"; // pink-500
+        ctx.fillText("VS", width / 2, barY + barH / 2);
+        
+        // 6. Draw Bottom Titles (SHOWDOWN SIMULATOR and dynamic Subtitle)
+        ctx.textBaseline = "middle";
+        
+        // Title (SHOWDOWN SIMULATOR)
+        ctx.font = 'normal 8px "Press Start 2P", monospace';
+        ctx.fillStyle = "rgba(244, 63, 94, 0.8)"; // pink-500/80
+        ctx.fillText("SHOWDOWN SIMULATOR", width / 2, 625);
+        
+        // Subtitle (Dynamic subtitle e.g. STREET FIGHT SIMULATOR)
+        ctx.font = 'normal 12px "Press Start 2P", monospace';
+        ctx.shadowColor = "#00f0ff";
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(subtitleRef.current, width / 2, 645);
+        ctx.shadowBlur = 0; // Reset shadow
+        
+        ctx.restore();
+      }
+
       ctx.restore(); // Restore camera screen shake
       updateLiveliness();
     });
@@ -2522,6 +2715,7 @@ export default function BoxingRing({
     }, 8000);
 
     return () => {
+      stopRecording();
       clearInterval(spawnIntervalId);
       activeTimeouts.forEach(clearTimeout);
       stopIntroMusic();
@@ -2538,61 +2732,7 @@ export default function BoxingRing({
           : "w-fit max-w-full"
         }`}
     >
-      {/* Cloned Reels HUD above the arena (Reel Mode) */}
-      {mode === "pvp" && p1State && p2State && isReelMode && (
-        <div
-          className="absolute left-1/2 z-20 flex items-center justify-between pointer-events-none select-none font-pixel w-[calc(100%-2.5rem)] max-w-[410px] gap-4"
-          style={{
-            top: "22.5%",
-            transform: "translate(-50%, calc(-100% - 12px))",
-          }}
-        >
-          {/* PLAYER 1 (INDIA) */}
-          <div className="flex-1 flex flex-col gap-1 min-w-0">
-            <div className="flex items-center justify-start gap-1">
-              <span className="font-pixel text-[12px] text-[#ff9933] font-bold uppercase truncate">
-                INDIA 🇮🇳
-              </span>
-            </div>
 
-            {/* Saffron Health Bar */}
-            <div className="h-4 bg-zinc-900 border border-zinc-950 rounded relative overflow-hidden flex items-center px-1.5 shadow-[0_0_10px_rgba(255,153,51,0.25)]">
-              <div
-                className="h-full bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-400 absolute left-0 top-0 transition-all duration-75"
-                style={{ width: `${(p1State.hp / p1State.maxHp) * 100}%` }}
-              />
-              <span className="font-pixel text-[6px] text-white z-10 font-bold uppercase shadow-sm">
-                HP: {Math.round((p1State.hp / p1State.maxHp) * 100)}%
-              </span>
-            </div>
-          </div>
-
-          {/* CENTRAL VS */}
-          <div className="flex-shrink-0 flex items-center justify-center h-full pt-3">
-            <span className="font-pixel text-[8px] text-pink-500 animate-pulse">VS</span>
-          </div>
-
-          {/* PLAYER 2 (PAKISTAN) */}
-          <div className="flex-1 flex flex-col gap-1 min-w-0">
-            <div className="flex items-center justify-end gap-1 text-right">
-              <span className="font-pixel text-[12px] text-[#115c36] font-bold uppercase truncate">
-                🇵🇰 PAKISTAN
-              </span>
-            </div>
-
-            {/* Green Health Bar */}
-            <div className="h-4 bg-zinc-900 border border-zinc-950 rounded relative overflow-hidden flex items-center justify-end px-1.5 shadow-[0_0_10px_rgba(17,92,54,0.25)]">
-              <div
-                className="h-full bg-gradient-to-l from-amber-600 via-yellow-500 to-amber-400 absolute right-0 top-0 transition-all duration-75"
-                style={{ width: `${(p2State.hp / p2State.maxHp) * 100}%` }}
-              />
-              <span className="font-pixel text-[6px] text-white z-10 font-bold uppercase shadow-sm">
-                HP: {Math.round((p2State.hp / p2State.maxHp) * 100)}%
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Retro Arcade HUD Overlay */}
       {mode === "pvp" && p1State && p2State && !isReelMode && (
@@ -2737,6 +2877,14 @@ export default function BoxingRing({
           }}
         />
       </div>
+
+      {/* Flashing RED REC Indicator Overlay */}
+      {isRecording && (
+        <div className="absolute top-4 right-4 z-30 flex items-center gap-1.5 pointer-events-none select-none font-pixel text-[8px] text-red-500 font-bold bg-black/60 px-2 py-1 rounded-md border border-red-800 shadow-[0_0_10px_rgba(239,68,68,0.25)] animate-pulse">
+          <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+          <span>REC 1080x1920</span>
+        </div>
+      )}
     </div>
   );
 }
