@@ -2550,7 +2550,7 @@ export default function BoxingRing({
           {/* PLAYER 1 (INDIA) */}
           <div className="flex-1 flex flex-col gap-1 min-w-0">
             <div className="flex items-center justify-start gap-1">
-              <span className="font-pixel text-[8px] text-[#ff9933] font-bold uppercase truncate">
+              <span className="font-pixel text-[12px] text-[#ff9933] font-bold uppercase truncate">
                 INDIA 🇮🇳
               </span>
             </div>
@@ -2575,7 +2575,7 @@ export default function BoxingRing({
           {/* PLAYER 2 (PAKISTAN) */}
           <div className="flex-1 flex flex-col gap-1 min-w-0">
             <div className="flex items-center justify-end gap-1 text-right">
-              <span className="font-pixel text-[8px] text-[#115c36] font-bold uppercase truncate">
+              <span className="font-pixel text-[12px] text-[#115c36] font-bold uppercase truncate">
                 🇵🇰 PAKISTAN
               </span>
             </div>
