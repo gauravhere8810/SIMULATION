@@ -158,11 +158,37 @@ function generateSpriteDataUrl(grid: string[], colorMap: Record<string, string>)
 }
 
 let audioCtx: AudioContext | null = null;
+let recordingDestNode: MediaStreamAudioDestinationNode | null = null;
+
+if (typeof window !== "undefined" && typeof AudioNode !== "undefined") {
+  try {
+    const originalConnect = AudioNode.prototype.connect;
+    (AudioNode.prototype as any).connect = function (target: any, ...args: any[]) {
+      try {
+        if (target === this.context.destination && (window as any).__recordingDestination) {
+          originalConnect.call(this, (window as any).__recordingDestination, ...args);
+        }
+      } catch (e) {
+        // Safe catch
+      }
+      return originalConnect.apply(this, arguments as any);
+    };
+  } catch (e) {
+    console.error("AudioNode prototype connection override failed:", e);
+  }
+}
 
 function getAudioContext() {
   if (typeof window === "undefined") return null;
   if (!audioCtx) {
-    audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    audioCtx = new AudioContextClass();
+    try {
+      recordingDestNode = audioCtx.createMediaStreamDestination();
+      (window as any).__recordingDestination = recordingDestNode;
+    } catch (e) {
+      console.error("Failed to create audio media stream destination:", e);
+    }
   }
   if (audioCtx.state === "suspended") {
     audioCtx.resume();
@@ -822,8 +848,22 @@ export default function BoxingRing({
   const startRecording = () => {
     if (typeof window === "undefined" || !canvasRef.current || !isReelModeRef.current) return;
     try {
+      // Force trigger AudioContext instantiation so we can capture audio if it hasn't started yet
+      getAudioContext();
+
       const canvas = canvasRef.current;
       const stream = canvas.captureStream(60);
+
+      // Merge audio track from global recording destination stream if available
+      if ((window as any).__recordingDestination) {
+        const audioStream = (window as any).__recordingDestination.stream;
+        const audioTracks = audioStream.getAudioTracks();
+        if (audioTracks.length > 0) {
+          stream.addTrack(audioTracks[0]);
+          console.log("Audio track merged into video capture stream!");
+        }
+      }
+
       const mime = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"]
         .find(m => MediaRecorder.isTypeSupported(m)) ?? "";
 
